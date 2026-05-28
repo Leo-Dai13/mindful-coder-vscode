@@ -2,8 +2,17 @@
   "name": "mindful-coder",
   "displayName": "Mindful Coder",
   "description": "Non-intrusive hydration, break, and sedentary reminders for VS Code.",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "publisher": "local",
+  "icon": "assets/icon.png",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Leo-Dai13/mindful-coder-vscode.git"
+  },
+  "homepage": "https://github.com/Leo-Dai13/mindful-coder-vscode#readme",
+  "bugs": {
+    "url": "https://github.com/Leo-Dai13/mindful-coder-vscode/issues"
+  },
   "license": "MIT",
   "engines": {
     "vscode": "^1.95.0"
