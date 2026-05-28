@@ -1694,16 +1694,18 @@ class MindfulController implements vscode.Disposable {
   <title>Mindful Coder ${escapeHtml(model.title)}</title>
   <style>
     :root {
-      color-scheme: light dark;
-      --bg: radial-gradient(circle at top left, color-mix(in srgb, ${accent} 20%, transparent), transparent 34%), radial-gradient(circle at bottom right, color-mix(in srgb, ${accentDeep} 34%, transparent), transparent 36%), linear-gradient(165deg, color-mix(in srgb, var(--vscode-editor-background) 88%, ${accent} 12%), color-mix(in srgb, var(--vscode-editor-background) 92%, ${accentDeep} 8%));
-      --panel: color-mix(in srgb, var(--vscode-sideBar-background) 84%, transparent);
-      --panel-strong: color-mix(in srgb, var(--vscode-editorWidget-background) 92%, ${accentDeep} 8%);
-      --border: color-mix(in srgb, var(--vscode-panel-border) 72%, transparent);
+      color-scheme: light;
+      --page: linear-gradient(180deg, #f4f5f8 0%, #edf1f7 100%);
+      --page-glow: radial-gradient(circle at top, color-mix(in srgb, ${accent} 12%, white 88%), transparent 52%);
+      --surface: rgba(255, 255, 255, 0.96);
+      --surface-soft: rgba(246, 247, 251, 0.98);
+      --surface-tint: color-mix(in srgb, ${accent} 6%, white 94%);
+      --border: rgba(15, 23, 42, 0.08);
       --accent: ${accent};
-      --accent-soft: color-mix(in srgb, ${accent} 22%, transparent);
-      --text: var(--vscode-editor-foreground);
-      --muted: color-mix(in srgb, var(--vscode-descriptionForeground) 88%, var(--vscode-editor-foreground) 12%);
-      --shadow: 0 18px 48px rgba(0, 0, 0, 0.18);
+      --accent-soft: color-mix(in srgb, ${accent} 14%, white 86%);
+      --text: #111827;
+      --muted: #6b7280;
+      --shadow: 0 28px 56px rgba(15, 23, 42, 0.14), 0 10px 24px rgba(15, 23, 42, 0.08);
     }
 
     * { box-sizing: border-box; }
@@ -1713,64 +1715,52 @@ class MindfulController implements vscode.Disposable {
       min-height: 100vh;
       display: grid;
       place-items: center;
-      padding: 24px;
-      font-family: 'Segoe UI Variable Text', 'Microsoft YaHei UI', sans-serif;
+      padding: 28px;
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'PingFang SC', 'Segoe UI Variable Text', 'Microsoft YaHei UI', sans-serif;
       color: var(--text);
-      background: var(--bg);
+      background: var(--page-glow), var(--page);
     }
 
     .sheet {
-      width: min(860px, 100%);
-      border-radius: 32px;
-      border: 1px solid var(--border);
-      background: linear-gradient(135deg, color-mix(in srgb, var(--panel-strong) 88%, ${accentDeep} 12%), color-mix(in srgb, var(--panel) 94%, transparent));
+      width: min(820px, 100%);
+      border-radius: 30px;
+      border: 1px solid rgba(255, 255, 255, 0.88);
+      background: linear-gradient(180deg, var(--surface) 0%, var(--surface-soft) 100%);
       box-shadow: var(--shadow);
-      padding: 34px;
-      backdrop-filter: blur(16px);
+      padding: 36px 32px 30px;
+      backdrop-filter: blur(24px);
       position: relative;
       overflow: hidden;
     }
 
-    .sheet::before,
-    .sheet::after {
+    .sheet::before {
       content: '';
       position: absolute;
+      top: 14px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 52px;
+      height: 5px;
       border-radius: 999px;
-      pointer-events: none;
-      opacity: 0.5;
-    }
-
-    .sheet::before {
-      width: 220px;
-      height: 220px;
-      top: -120px;
-      right: -80px;
-      background: radial-gradient(circle, color-mix(in srgb, var(--accent) 28%, transparent), transparent 68%);
-    }
-
-    .sheet::after {
-      width: 160px;
-      height: 160px;
-      bottom: -60px;
-      left: -40px;
-      background: radial-gradient(circle, color-mix(in srgb, ${accentDeep} 32%, transparent), transparent 70%);
+      background: rgba(60, 60, 67, 0.18);
     }
 
     .hero {
       display: grid;
       grid-template-columns: minmax(0, 1.25fr) minmax(240px, 0.75fr);
-      gap: 20px;
+      gap: 18px;
       align-items: start;
       position: relative;
       z-index: 1;
     }
 
     .eyebrow {
-      font-size: 12px;
-      letter-spacing: 0.24em;
+      font-size: 11px;
+      letter-spacing: 0.18em;
       text-transform: uppercase;
-      color: var(--accent);
-      margin-bottom: 10px;
+      color: #8e8e93;
+      margin-bottom: 12px;
+      font-weight: 600;
     }
 
     h1, p { margin: 0; }
@@ -1778,82 +1768,83 @@ class MindfulController implements vscode.Disposable {
     .title-row {
       display: flex;
       align-items: center;
-      gap: 16px;
-      margin-bottom: 14px;
+      gap: 14px;
+      margin-bottom: 12px;
     }
 
     .icon-badge {
-      width: 68px;
-      height: 68px;
+      width: 64px;
+      height: 64px;
       flex: 0 0 auto;
       display: grid;
       place-items: center;
-      border-radius: 22px;
-      font-size: 34px;
-      background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 26%, transparent), color-mix(in srgb, ${accentDeep} 24%, transparent));
-      border: 1px solid color-mix(in srgb, var(--accent) 42%, var(--border) 58%);
-      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+      border-radius: 20px;
+      font-size: 32px;
+      background: linear-gradient(180deg, var(--accent-soft), color-mix(in srgb, var(--accent) 18%, white 82%));
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9), 0 10px 22px color-mix(in srgb, var(--accent) 14%, transparent);
     }
 
     h1 {
-      font-size: clamp(28px, 5vw, 42px);
+      font-size: clamp(28px, 5vw, 40px);
       font-weight: 700;
+      letter-spacing: -0.03em;
     }
 
     .headline {
-      font-size: 16px;
+      font-size: 15px;
       font-weight: 600;
-      color: var(--text);
-      margin-bottom: 16px;
+      color: #3c3c43;
+      margin-bottom: 14px;
     }
 
     .message {
       font-size: 16px;
-      line-height: 1.8;
+      line-height: 1.75;
       color: var(--muted);
       margin-bottom: 0;
     }
 
     .aside {
-      border-radius: 24px;
+      border-radius: 22px;
       padding: 18px;
-      background: linear-gradient(180deg, color-mix(in srgb, var(--panel-strong) 92%, transparent), color-mix(in srgb, var(--panel) 88%, transparent));
-      border: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
-      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+      background: linear-gradient(180deg, rgba(250, 250, 252, 0.98), rgba(244, 245, 249, 0.98));
+      border: 1px solid rgba(15, 23, 42, 0.06);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.96);
     }
 
     .chips {
       display: flex;
-      gap: 10px;
+      gap: 8px;
       flex-wrap: wrap;
-      margin-bottom: 16px;
+      margin-bottom: 14px;
     }
 
     .chip {
       display: inline-flex;
       align-items: center;
-      gap: 8px;
+      gap: 6px;
       padding: 8px 12px;
       border-radius: 999px;
-      border: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
-      background: color-mix(in srgb, var(--panel) 88%, transparent);
-      color: var(--muted);
+      border: 1px solid rgba(15, 23, 42, 0.06);
+      background: rgba(255, 255, 255, 0.88);
+      color: #6d7280;
       font-size: 12px;
       line-height: 1;
     }
 
     .chip.primary {
-      color: var(--text);
-      border-color: color-mix(in srgb, var(--accent) 46%, var(--border) 54%);
+      color: var(--accent);
+      border-color: color-mix(in srgb, var(--accent) 20%, white 80%);
       background: var(--accent-soft);
+      font-weight: 600;
     }
 
     .notice {
       padding: 16px 18px;
       border-radius: 18px;
-      border: 1px solid color-mix(in srgb, var(--accent) 42%, var(--border) 58%);
-      background: color-mix(in srgb, var(--accent) 14%, transparent);
-      color: var(--text);
+      border: 1px solid color-mix(in srgb, var(--accent) 16%, white 84%);
+      background: color-mix(in srgb, var(--accent) 8%, white 92%);
+      color: #3c3c43;
       line-height: 1.6;
       margin-bottom: 0;
     }
@@ -1862,7 +1853,7 @@ class MindfulController implements vscode.Disposable {
       display: flex;
       gap: 12px;
       flex-wrap: wrap;
-      margin-top: 24px;
+      margin-top: 22px;
       position: relative;
       z-index: 1;
     }
@@ -1870,23 +1861,25 @@ class MindfulController implements vscode.Disposable {
     button {
       appearance: none;
       border: 1px solid transparent;
-      border-radius: 14px;
-      padding: 13px 18px;
+      border-radius: 16px;
+      padding: 13px 20px;
       font: inherit;
+      font-weight: 600;
       cursor: pointer;
       transition: transform 140ms ease, opacity 140ms ease, border-color 140ms ease, box-shadow 140ms ease;
     }
 
     button.primary {
-      color: #0f1b22;
-      background: linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 72%, white 28%));
-      box-shadow: 0 12px 28px rgba(0, 0, 0, 0.18);
+      color: white;
+      background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 88%, white 12%), var(--accent));
+      box-shadow: 0 14px 28px color-mix(in srgb, var(--accent) 22%, transparent);
     }
 
     button.ghost {
-      color: var(--text);
-      background: color-mix(in srgb, var(--panel-strong) 86%, transparent);
-      border: 1px solid color-mix(in srgb, var(--border) 85%, transparent);
+      color: #1f2937;
+      background: rgba(255, 255, 255, 0.92);
+      border: 1px solid rgba(15, 23, 42, 0.08);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.92);
     }
 
     button:hover {
@@ -1896,13 +1889,13 @@ class MindfulController implements vscode.Disposable {
 
     button:focus-visible {
       outline: none;
-      border-color: color-mix(in srgb, var(--accent) 58%, white 42%);
-      box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 24%, transparent);
+      border-color: color-mix(in srgb, var(--accent) 40%, white 60%);
+      box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 18%, white 82%);
     }
 
     .footnote {
       margin-top: 18px;
-      color: var(--muted);
+      color: #8e8e93;
       font-size: 12px;
       line-height: 1.6;
       position: relative;

@@ -4,7 +4,7 @@
   "description": "Non-intrusive hydration, break, and sedentary reminders for VS Code.",
   "version": "0.0.1",
   "publisher": "local",
-  "license": "UNLICENSED",
+  "license": "MIT",
   "engines": {
     "vscode": "^1.95.0"
   },
