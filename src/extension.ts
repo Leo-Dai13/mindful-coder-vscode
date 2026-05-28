@@ -1791,22 +1791,10 @@ class MindfulController implements vscode.Disposable {
     }
 
     .hero {
-      display: grid;
-      grid-template-columns: minmax(0, 1fr) minmax(220px, 0.72fr);
-      gap: 14px;
-      align-items: stretch;
+      display: block;
       position: relative;
       z-index: 1;
-      margin-top: 18px;
-    }
-
-    .eyebrow {
-      font-size: 10px;
-      letter-spacing: 0.16em;
-      text-transform: uppercase;
-      color: #8e8e93;
-      margin-bottom: 10px;
-      font-weight: 600;
+      margin-top: 16px;
     }
 
     h1, p { margin: 0; }
@@ -1815,84 +1803,31 @@ class MindfulController implements vscode.Disposable {
       display: flex;
       align-items: center;
       gap: 12px;
-      margin-bottom: 10px;
+      margin-bottom: 14px;
     }
 
     .icon-badge {
-      width: 56px;
-      height: 56px;
+      width: 52px;
+      height: 52px;
       flex: 0 0 auto;
       display: grid;
       place-items: center;
-      border-radius: 18px;
-      font-size: 28px;
+      border-radius: 16px;
+      font-size: 26px;
       background: linear-gradient(180deg, var(--accent-soft), color-mix(in srgb, var(--accent) 12%, white 88%));
       box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.92), 0 8px 18px color-mix(in srgb, var(--accent) 10%, transparent);
     }
 
     h1 {
-      font-size: clamp(26px, 4.8vw, 36px);
+      font-size: clamp(24px, 4.4vw, 34px);
       font-weight: 700;
       letter-spacing: -0.035em;
     }
 
-    .headline {
-      font-size: 14px;
-      font-weight: 600;
-      color: #3c3c43;
-      margin-bottom: 12px;
-    }
-
     .message {
-      font-size: 15px;
-      line-height: 1.65;
+      font-size: 14px;
+      line-height: 1.6;
       color: var(--muted);
-      margin-bottom: 0;
-    }
-
-    .aside {
-      border-radius: 20px;
-      padding: 14px;
-      background: linear-gradient(180deg, rgba(250, 250, 252, 0.98), rgba(246, 247, 250, 0.98));
-      border: 1px solid var(--hairline);
-      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.96);
-    }
-
-    .chips {
-      display: flex;
-      gap: 6px;
-      flex-wrap: wrap;
-      margin-bottom: 10px;
-    }
-
-    .chip {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      padding: 7px 10px;
-      border-radius: 999px;
-      border: 1px solid var(--hairline);
-      background: rgba(255, 255, 255, 0.9);
-      color: #6d7280;
-      font-size: 11px;
-      line-height: 1;
-    }
-
-    .chip.primary {
-      color: var(--accent);
-      border-color: color-mix(in srgb, var(--accent) 16%, white 84%);
-      background: var(--accent-soft);
-      font-weight: 600;
-    }
-
-    .notice {
-      padding: 14px;
-      border-radius: 16px;
-      border: 1px solid color-mix(in srgb, var(--accent) 12%, white 88%);
-      background: color-mix(in srgb, var(--accent) 6%, white 94%);
-      color: #3c3c43;
-      line-height: 1.55;
-      font-size: 13px;
       margin-bottom: 0;
     }
 
@@ -1900,7 +1835,7 @@ class MindfulController implements vscode.Disposable {
       display: flex;
       gap: 10px;
       flex-wrap: wrap;
-      margin-top: 16px;
+      margin-top: 24px;
       position: relative;
       z-index: 1;
     }
@@ -1939,20 +1874,7 @@ class MindfulController implements vscode.Disposable {
       box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 12%, white 88%);
     }
 
-    .footnote {
-      margin-top: 14px;
-      color: #8e8e93;
-      font-size: 12px;
-      line-height: 1.5;
-      position: relative;
-      z-index: 1;
-    }
-
     @media (max-width: 640px) {
-      .hero {
-        grid-template-columns: 1fr;
-      }
-
       .sheet {
         padding: 16px 16px 18px;
       }
@@ -1974,28 +1896,15 @@ class MindfulController implements vscode.Disposable {
 <body>
   <main class="sheet">
     <section class="hero">
-      <div>
-        <div class="eyebrow">Mindful Coder</div>
-        <div class="title-row">
-          <div class="icon-badge">${icon}</div>
-          <div>
-            <h1>${escapeHtml(model.title)}</h1>
-            <p class="headline">${escapeHtml(model.headline)}</p>
-          </div>
+      <div class="title-row">
+        <div class="icon-badge">${icon}</div>
+        <div>
+          <h1>${escapeHtml(model.title)}</h1>
         </div>
-        <p class="message">${escapeHtml(model.message)}</p>
       </div>
-      <aside class="aside">
-        <div class="chips">
-          <span class="chip primary">${toneLabel}</span>
-          <span class="chip">3 分钟自动忽略</span>
-          <span class="chip">非模态提醒</span>
-        </div>
-        <div class="notice">关闭页面或 3 分钟内不处理，本次提醒会自动视为忽略，并从当前时刻重新开始计时。</div>
-      </aside>
+      <p class="message">${escapeHtml(model.message)}</p>
     </section>
     <div class="actions">${actionButtons}</div>
-    <p class="footnote">这是一个页面式提醒面板，不使用模态弹窗，也不会锁住编辑器输入。</p>
   </main>
 
   <script nonce="${nonce}">
