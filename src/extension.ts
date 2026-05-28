@@ -102,6 +102,8 @@ interface StatsPanelOptions {
   preserveFocus?: boolean;
 }
 
+type ReminderKind = 'hydration' | 'rest' | 'sedentary' | 'offWork';
+
 interface ReminderPanelModel {
   title: string;
   headline: string;
@@ -247,12 +249,11 @@ class MindfulController implements vscode.Disposable {
   private readonly activityTracker: ActivityTracker;
   private readonly disposables: vscode.Disposable[] = [];
   private readonly tickHandle: ReturnType<typeof setInterval>;
-  private isNotificationInFlight = false;
   private sedentaryLastSessionStart?: number;
   private sedentarySnoozeUntil?: number;
   private sedentaryLastNotifiedAt?: number;
   private statsPanel?: vscode.WebviewPanel;
-  private reminderPanel?: vscode.WebviewPanel;
+  private readonly reminderPanels = new Map<ReminderKind, vscode.WebviewPanel>();
   private pendingReminderCheckHandle?: ReturnType<typeof setTimeout>;
 
   constructor(private readonly context: vscode.ExtensionContext) {
@@ -298,6 +299,13 @@ class MindfulController implements vscode.Disposable {
         clearTimeout(this.pendingReminderCheckHandle);
         this.pendingReminderCheckHandle = undefined;
       }
+    }));
+
+    this.disposables.push(new vscode.Disposable(() => {
+      for (const panel of this.reminderPanels.values()) {
+        panel.dispose();
+      }
+      this.reminderPanels.clear();
     }));
 
     void this.tick();
@@ -489,32 +497,35 @@ class MindfulController implements vscode.Disposable {
   }
 
   private async maybeNotify(now: number, snapshot: ActivitySnapshot): Promise<void> {
-    if (this.isNotificationInFlight) {
-      return;
-    }
+    const notifications: Promise<void>[] = [];
 
     if (this.shouldNotifyOffWorkSummary(now)) {
-      await this.notifyOffWorkSummary(now);
-      return;
+      notifications.push(this.notifyOffWorkSummary(now));
     }
 
     if (this.shouldNotifySedentary(now, snapshot)) {
-      await this.notifySedentary(now, snapshot);
-      return;
+      notifications.push(this.notifySedentary(now, snapshot));
     }
 
     if (this.shouldNotifyRest(now)) {
-      await this.notifyRest(now);
-      return;
+      notifications.push(this.notifyRest(now));
     }
 
     if (this.shouldNotifyHydration(now)) {
-      await this.notifyHydration(now);
+      notifications.push(this.notifyHydration(now));
+    }
+
+    if (notifications.length > 0) {
+      await Promise.all(notifications);
     }
   }
 
   private shouldNotifyHydration(now: number): boolean {
     if (!this.config.hydration.enabled || !this.config.hydration.notification) {
+      return false;
+    }
+
+    if (this.reminderPanels.has('hydration')) {
       return false;
     }
 
@@ -527,6 +538,10 @@ class MindfulController implements vscode.Disposable {
       return false;
     }
 
+    if (this.reminderPanels.has('rest')) {
+      return false;
+    }
+
     const dueAt = this.getRestDueAt();
     return now >= dueAt && (this.restState.lastNotifiedAt ?? 0) < dueAt;
   }
@@ -536,12 +551,20 @@ class MindfulController implements vscode.Disposable {
       return false;
     }
 
+    if (this.reminderPanels.has('sedentary')) {
+      return false;
+    }
+
     const dueAt = this.getSedentaryDueAt(snapshot);
     return dueAt !== undefined && now >= dueAt && (this.sedentaryLastNotifiedAt ?? 0) < dueAt;
   }
 
   private shouldNotifyOffWorkSummary(now: number): boolean {
     if (!this.hasWorkdayStats()) {
+      return false;
+    }
+
+    if (this.reminderPanels.has('offWork')) {
       return false;
     }
 
@@ -557,6 +580,7 @@ class MindfulController implements vscode.Disposable {
     this.hydrationState.lastNotifiedAt = now;
     await this.saveHydrationState();
     await this.showNotification(
+      'hydration',
       '喝水提醒',
       'info',
       this.config.hydration.sound,
@@ -587,6 +611,7 @@ class MindfulController implements vscode.Disposable {
     this.restState.lastNotifiedAt = now;
     await this.saveRestState();
     await this.showNotification(
+      'rest',
       '休息提醒',
       'warning',
       this.config.rest.sound,
@@ -616,6 +641,7 @@ class MindfulController implements vscode.Disposable {
   private async notifySedentary(now: number, snapshot: ActivitySnapshot): Promise<void> {
     this.sedentaryLastNotifiedAt = now;
     await this.showNotification(
+      'sedentary',
       '久坐提醒',
       'warning',
       this.config.sedentary.sound,
@@ -647,6 +673,7 @@ class MindfulController implements vscode.Disposable {
       preserveFocus: false,
     });
     await this.showNotification(
+      'offWork',
       '下班提醒',
       'warning',
       false,
@@ -667,6 +694,7 @@ class MindfulController implements vscode.Disposable {
   }
 
   private async showNotification(
+    kind: ReminderKind,
     title: string,
     severity: 'info' | 'warning',
     playSoundEnabled: boolean,
@@ -675,7 +703,10 @@ class MindfulController implements vscode.Disposable {
     onSelection: (selection: string | undefined) => Promise<void>,
     onIgnored: (ignoredAt: number) => Promise<void>,
   ): Promise<void> {
-    this.isNotificationInFlight = true;
+    if (this.reminderPanels.has(kind)) {
+      return;
+    }
+
     this.flashStatus(message);
 
     if (playSoundEnabled) {
@@ -683,7 +714,7 @@ class MindfulController implements vscode.Disposable {
     }
 
     try {
-      const selection = await this.showReminderPanel({
+      const selection = await this.showReminderPanel(kind, {
         title,
         headline: severity === 'warning' ? '需要你看一眼' : '轻提醒',
         message,
@@ -698,28 +729,30 @@ class MindfulController implements vscode.Disposable {
 
       await onSelection(selection);
     } finally {
-      this.isNotificationInFlight = false;
       this.updateStatusBar();
     }
   }
 
-  private async showReminderPanel(model: ReminderPanelModel): Promise<string | undefined | typeof notificationTimedOut> {
-    if (this.reminderPanel) {
-      this.reminderPanel.dispose();
-      this.reminderPanel = undefined;
+  private async showReminderPanel(kind: ReminderKind, model: ReminderPanelModel): Promise<string | undefined | typeof notificationTimedOut> {
+    if (this.reminderPanels.has(kind)) {
+      return undefined;
     }
 
+    const viewColumn = this.reminderPanels.size === 0
+      ? vscode.ViewColumn.Active
+      : vscode.ViewColumn.Beside;
+
     const panel = vscode.window.createWebviewPanel(
-      'mindfulCoder.reminder',
+      `mindfulCoder.reminder.${kind}`,
       `Mindful Coder ${model.title}`,
-      { viewColumn: vscode.ViewColumn.Active, preserveFocus: false },
+      { viewColumn, preserveFocus: false },
       {
         enableScripts: true,
         retainContextWhenHidden: false,
       },
     );
 
-    this.reminderPanel = panel;
+    this.reminderPanels.set(kind, panel);
     panel.webview.html = this.getReminderWebviewHtml(panel.webview, model);
 
     return await new Promise<string | undefined | typeof notificationTimedOut>((resolve) => {
@@ -736,8 +769,8 @@ class MindfulController implements vscode.Disposable {
           clearTimeout(timeoutHandle);
         }
 
-        if (this.reminderPanel === panel) {
-          this.reminderPanel = undefined;
+        if (this.reminderPanels.get(kind) === panel) {
+          this.reminderPanels.delete(kind);
         }
 
         resolve(result);
@@ -754,8 +787,8 @@ class MindfulController implements vscode.Disposable {
           return;
         }
 
-        if (this.reminderPanel === panel) {
-          this.reminderPanel = undefined;
+        if (this.reminderPanels.get(kind) === panel) {
+          this.reminderPanels.delete(kind);
         }
       }, undefined, this.disposables);
 
@@ -1709,15 +1742,14 @@ class MindfulController implements vscode.Disposable {
     :root {
       color-scheme: light;
       --page: var(--vscode-editor-background);
-      --page-glow: radial-gradient(circle at top, color-mix(in srgb, ${accent} 10%, transparent), transparent 48%);
-      --surface: color-mix(in srgb, var(--vscode-editor-background) 86%, white 14%);
-      --surface-soft: color-mix(in srgb, var(--vscode-editorWidget-background) 74%, var(--vscode-editor-background) 26%);
-      --border: color-mix(in srgb, var(--vscode-panel-border) 72%, transparent);
+      --surface: rgba(255, 255, 255, 0.98);
+      --surface-soft: rgba(246, 247, 251, 0.98);
+      --border: rgba(15, 23, 42, 0.06);
       --accent: ${accent};
-      --accent-soft: color-mix(in srgb, ${accent} 14%, var(--vscode-editor-background) 86%);
-      --text: var(--vscode-editor-foreground);
-      --muted: color-mix(in srgb, var(--vscode-descriptionForeground) 82%, var(--vscode-editor-foreground) 18%);
-      --hairline: color-mix(in srgb, var(--vscode-panel-border) 65%, transparent);
+      --accent-soft: color-mix(in srgb, ${accent} 12%, white 88%);
+      --text: #1c1c1e;
+      --muted: #6e6e73;
+      --hairline: rgba(60, 60, 67, 0.14);
       --shadow: 0 22px 44px rgba(15, 23, 42, 0.10), 0 6px 18px rgba(15, 23, 42, 0.05);
     }
 
@@ -1731,7 +1763,7 @@ class MindfulController implements vscode.Disposable {
       padding: 28px;
       font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'PingFang SC', 'Segoe UI Variable Text', 'Microsoft YaHei UI', sans-serif;
       color: var(--text);
-      background: var(--page-glow), var(--page);
+      background: var(--page);
     }
 
     .sheet {
@@ -1772,7 +1804,7 @@ class MindfulController implements vscode.Disposable {
       font-size: 10px;
       letter-spacing: 0.16em;
       text-transform: uppercase;
-      color: var(--muted);
+      color: #8e8e93;
       margin-bottom: 10px;
       font-weight: 600;
     }
@@ -1807,7 +1839,7 @@ class MindfulController implements vscode.Disposable {
     .headline {
       font-size: 14px;
       font-weight: 600;
-      color: var(--text);
+      color: #3c3c43;
       margin-bottom: 12px;
     }
 
@@ -1821,9 +1853,9 @@ class MindfulController implements vscode.Disposable {
     .aside {
       border-radius: 20px;
       padding: 14px;
-      background: color-mix(in srgb, var(--vscode-sideBar-background) 76%, var(--surface) 24%);
+      background: linear-gradient(180deg, rgba(250, 250, 252, 0.98), rgba(246, 247, 250, 0.98));
       border: 1px solid var(--hairline);
-      box-shadow: inset 0 1px 0 color-mix(in srgb, var(--vscode-editorWidget-border) 30%, transparent);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.96);
     }
 
     .chips {
@@ -1840,8 +1872,8 @@ class MindfulController implements vscode.Disposable {
       padding: 7px 10px;
       border-radius: 999px;
       border: 1px solid var(--hairline);
-      background: color-mix(in srgb, var(--surface-soft) 78%, transparent);
-      color: var(--muted);
+      background: rgba(255, 255, 255, 0.9);
+      color: #6d7280;
       font-size: 11px;
       line-height: 1;
     }
@@ -1856,9 +1888,9 @@ class MindfulController implements vscode.Disposable {
     .notice {
       padding: 14px;
       border-radius: 16px;
-      border: 1px solid color-mix(in srgb, var(--accent) 18%, var(--hairline) 82%);
-      background: color-mix(in srgb, var(--accent) 8%, var(--surface-soft) 92%);
-      color: var(--text);
+      border: 1px solid color-mix(in srgb, var(--accent) 12%, white 88%);
+      background: color-mix(in srgb, var(--accent) 6%, white 94%);
+      color: #3c3c43;
       line-height: 1.55;
       font-size: 13px;
       margin-bottom: 0;
@@ -1891,10 +1923,10 @@ class MindfulController implements vscode.Disposable {
     }
 
     button.ghost {
-      color: var(--text);
-      background: color-mix(in srgb, var(--surface-soft) 82%, transparent);
+      color: #1f2937;
+      background: rgba(255, 255, 255, 0.92);
       border: 1px solid var(--hairline);
-      box-shadow: inset 0 1px 0 color-mix(in srgb, var(--vscode-editorWidget-border) 26%, transparent);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.92);
     }
 
     button:hover {
@@ -1909,7 +1941,7 @@ class MindfulController implements vscode.Disposable {
 
     .footnote {
       margin-top: 14px;
-      color: var(--muted);
+      color: #8e8e93;
       font-size: 12px;
       line-height: 1.5;
       position: relative;
