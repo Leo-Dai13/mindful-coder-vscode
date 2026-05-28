@@ -102,6 +102,14 @@ interface StatsPanelOptions {
   preserveFocus?: boolean;
 }
 
+interface ReminderPanelModel {
+  title: string;
+  headline: string;
+  message: string;
+  severity: 'info' | 'warning';
+  actions: string[];
+}
+
 class ActivityTracker implements vscode.Disposable {
   private readonly disposables: vscode.Disposable[] = [];
   private focused = vscode.window.state.focused;
@@ -244,6 +252,7 @@ class MindfulController implements vscode.Disposable {
   private sedentarySnoozeUntil?: number;
   private sedentaryLastNotifiedAt?: number;
   private statsPanel?: vscode.WebviewPanel;
+  private reminderPanel?: vscode.WebviewPanel;
 
   constructor(private readonly context: vscode.ExtensionContext) {
     const now = Date.now();
@@ -522,6 +531,7 @@ class MindfulController implements vscode.Disposable {
     this.hydrationState.lastNotifiedAt = now;
     await this.saveHydrationState();
     await this.showNotification(
+      '喝水提醒',
       'info',
       this.config.hydration.sound,
       '喝口水，顺便活动一下肩颈。',
@@ -551,6 +561,7 @@ class MindfulController implements vscode.Disposable {
     this.restState.lastNotifiedAt = now;
     await this.saveRestState();
     await this.showNotification(
+      '休息提醒',
       'warning',
       this.config.rest.sound,
       '该休息一下了：站起来、看远处20秒、活动肩颈。',
@@ -574,6 +585,7 @@ class MindfulController implements vscode.Disposable {
   private async notifySedentary(now: number, snapshot: ActivitySnapshot): Promise<void> {
     this.sedentaryLastNotifiedAt = now;
     await this.showNotification(
+      '久坐提醒',
       'warning',
       this.config.sedentary.sound,
       `你已经连续工作 ${formatDurationCompact(snapshot.continuousActiveMs)} 了，建议起身动一动。`,
@@ -604,6 +616,7 @@ class MindfulController implements vscode.Disposable {
       preserveFocus: false,
     });
     await this.showNotification(
+      '下班提醒',
       'warning',
       false,
       '到下班时间了，已为你打开今日统计。',
@@ -623,6 +636,7 @@ class MindfulController implements vscode.Disposable {
   }
 
   private async showNotification(
+    title: string,
     severity: 'info' | 'warning',
     playSoundEnabled: boolean,
     message: string,
@@ -638,25 +652,16 @@ class MindfulController implements vscode.Disposable {
     }
 
     try {
-      const messagePromise = severity === 'warning'
-        ? vscode.window.showWarningMessage(message, ...items)
-        : vscode.window.showInformationMessage(message, ...items);
-      const selection = await Promise.race<string | undefined | typeof notificationTimedOut>([
-        messagePromise,
-        new Promise<typeof notificationTimedOut>((resolve) => {
-          setTimeout(() => {
-            resolve(notificationTimedOut);
-          }, NOTIFICATION_IGNORE_MS);
-        }),
-      ]);
+      const selection = await this.showReminderPanel({
+        title,
+        headline: severity === 'warning' ? '需要你看一眼' : '轻提醒',
+        message,
+        severity,
+        actions: items,
+      });
 
       if (selection === notificationTimedOut || selection === undefined) {
         await onIgnored(Date.now());
-        try {
-          await messagePromise;
-        } catch {
-          // Ignore notification API failures while waiting for the stale message to settle.
-        }
         return;
       }
 
@@ -665,6 +670,73 @@ class MindfulController implements vscode.Disposable {
       this.isNotificationInFlight = false;
       this.updateStatusBar();
     }
+  }
+
+  private async showReminderPanel(model: ReminderPanelModel): Promise<string | undefined | typeof notificationTimedOut> {
+    if (this.reminderPanel) {
+      this.reminderPanel.dispose();
+      this.reminderPanel = undefined;
+    }
+
+    const panel = vscode.window.createWebviewPanel(
+      'mindfulCoder.reminder',
+      `Mindful Coder ${model.title}`,
+      vscode.ViewColumn.Active,
+      {
+        enableScripts: true,
+        retainContextWhenHidden: false,
+      },
+    );
+
+    this.reminderPanel = panel;
+    panel.webview.html = this.getReminderWebviewHtml(panel.webview, model);
+
+    return await new Promise<string | undefined | typeof notificationTimedOut>((resolve) => {
+      let settled = false;
+      let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
+
+      const finalize = (result: string | undefined | typeof notificationTimedOut): void => {
+        if (settled) {
+          return;
+        }
+
+        settled = true;
+        if (timeoutHandle) {
+          clearTimeout(timeoutHandle);
+        }
+
+        if (this.reminderPanel === panel) {
+          this.reminderPanel = undefined;
+        }
+
+        resolve(result);
+      };
+
+      timeoutHandle = setTimeout(() => {
+        finalize(notificationTimedOut);
+        panel.dispose();
+      }, NOTIFICATION_IGNORE_MS);
+
+      panel.onDidDispose(() => {
+        if (!settled) {
+          finalize(undefined);
+          return;
+        }
+
+        if (this.reminderPanel === panel) {
+          this.reminderPanel = undefined;
+        }
+      }, undefined, this.disposables);
+
+      panel.webview.onDidReceiveMessage((message: { action?: string }) => {
+        if (!message.action) {
+          return;
+        }
+
+        finalize(message.action);
+        panel.dispose();
+      }, undefined, this.disposables);
+    });
   }
 
   private async ignoreHydrationReminder(ignoredAt: number): Promise<void> {
@@ -1556,6 +1628,172 @@ class MindfulController implements vscode.Disposable {
 </body>
 </html>`;
   }
+
+  private getReminderWebviewHtml(webview: vscode.Webview, model: ReminderPanelModel): string {
+    const nonce = createNonce();
+    const actionButtons = model.actions.map((action, index) => {
+      const className = index === 0 ? 'primary' : 'ghost';
+      return `<button class="${className}" data-action="${escapeHtml(action)}">${escapeHtml(action)}</button>`;
+    }).join('');
+    const accent = model.severity === 'warning' ? '#f2a65a' : '#61c0bf';
+    const accentDeep = model.severity === 'warning' ? '#8d4a1f' : '#0f4f56';
+
+    return `<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}';">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mindful Coder ${escapeHtml(model.title)}</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      --bg: linear-gradient(165deg, color-mix(in srgb, var(--vscode-editor-background) 88%, ${accent} 12%), color-mix(in srgb, var(--vscode-editor-background) 92%, ${accentDeep} 8%));
+      --panel: color-mix(in srgb, var(--vscode-sideBar-background) 84%, transparent);
+      --panel-strong: color-mix(in srgb, var(--vscode-editorWidget-background) 92%, ${accentDeep} 8%);
+      --border: color-mix(in srgb, var(--vscode-panel-border) 72%, transparent);
+      --accent: ${accent};
+      --text: var(--vscode-editor-foreground);
+      --muted: color-mix(in srgb, var(--vscode-descriptionForeground) 88%, var(--vscode-editor-foreground) 12%);
+      --shadow: 0 18px 48px rgba(0, 0, 0, 0.18);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      padding: 28px;
+      font-family: 'Segoe UI Variable Text', 'Microsoft YaHei UI', sans-serif;
+      color: var(--text);
+      background: var(--bg);
+    }
+
+    .sheet {
+      width: min(760px, 100%);
+      border-radius: 28px;
+      border: 1px solid var(--border);
+      background: linear-gradient(135deg, color-mix(in srgb, var(--panel-strong) 88%, ${accentDeep} 12%), color-mix(in srgb, var(--panel) 94%, transparent));
+      box-shadow: var(--shadow);
+      padding: 30px;
+      backdrop-filter: blur(16px);
+    }
+
+    .eyebrow {
+      font-size: 12px;
+      letter-spacing: 0.24em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 12px;
+    }
+
+    h1, p { margin: 0; }
+
+    h1 {
+      font-size: clamp(28px, 5vw, 42px);
+      font-weight: 700;
+      margin-bottom: 12px;
+    }
+
+    .headline {
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--text);
+      margin-bottom: 16px;
+    }
+
+    .message {
+      font-size: 16px;
+      line-height: 1.75;
+      color: var(--muted);
+      margin-bottom: 22px;
+    }
+
+    .notice {
+      padding: 14px 16px;
+      border-radius: 18px;
+      border: 1px solid color-mix(in srgb, var(--accent) 42%, var(--border) 58%);
+      background: color-mix(in srgb, var(--accent) 14%, transparent);
+      color: var(--text);
+      line-height: 1.6;
+      margin-bottom: 22px;
+    }
+
+    .actions {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    button {
+      appearance: none;
+      border: 0;
+      border-radius: 14px;
+      padding: 12px 18px;
+      font: inherit;
+      cursor: pointer;
+      transition: transform 140ms ease, opacity 140ms ease;
+    }
+
+    button.primary {
+      color: #0f1b22;
+      background: linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 72%, white 28%));
+      box-shadow: 0 10px 24px rgba(0, 0, 0, 0.16);
+    }
+
+    button.ghost {
+      color: var(--text);
+      background: color-mix(in srgb, var(--panel-strong) 86%, transparent);
+      border: 1px solid color-mix(in srgb, var(--border) 85%, transparent);
+    }
+
+    button:hover {
+      transform: translateY(-1px);
+      opacity: 0.98;
+    }
+
+    .footnote {
+      margin-top: 16px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.6;
+    }
+
+    @media (max-width: 640px) {
+      .actions {
+        flex-direction: column;
+      }
+
+      button {
+        width: 100%;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="sheet">
+    <div class="eyebrow">Mindful Coder</div>
+    <h1>${escapeHtml(model.title)}</h1>
+    <p class="headline">${escapeHtml(model.headline)}</p>
+    <p class="message">${escapeHtml(model.message)}</p>
+    <div class="notice">关闭页面或 3 分钟内不处理，本次提醒会自动视为忽略，并从当前时刻重新开始计时。</div>
+    <div class="actions">${actionButtons}</div>
+    <p class="footnote">这是一个页面式提醒面板，不使用模态弹窗，也不会锁住编辑器输入。</p>
+  </main>
+
+  <script nonce="${nonce}">
+    const vscode = acquireVsCodeApi();
+    document.querySelectorAll('[data-action]').forEach((button) => {
+      button.addEventListener('click', () => {
+        vscode.postMessage({ action: button.dataset.action });
+      });
+    });
+  </script>
+</body>
+</html>`;
+  }
 }
 
 function readConfig(): AppConfig {
@@ -1788,6 +2026,15 @@ function getWorkdayEndTimestamp(now: number, endTime: string): number | undefine
 
 function createNonce(): string {
   return `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function escapeHtml(value: string): string {
+  return value
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;');
 }
 
 function playNotificationSound(): void {
