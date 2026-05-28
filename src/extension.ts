@@ -591,7 +591,7 @@ class MindfulController implements vscode.Disposable {
       'warning',
       this.config.rest.sound,
       '该休息一下了：站起来、看远处20秒、活动肩颈。',
-      ['已休息', '稍后10分钟'],
+      ['已休息', '稍后10分钟', '查看统计'],
       async (selection) => {
         if (selection === '已休息') {
           await this.markBreakTaken('notification');
@@ -600,6 +600,11 @@ class MindfulController implements vscode.Disposable {
 
         if (selection === '稍后10分钟') {
           await this.snoozeRest();
+          return;
+        }
+
+        if (selection === '查看统计') {
+          await this.showStats();
         }
       },
       async (ignoredAt) => {
@@ -756,6 +761,14 @@ class MindfulController implements vscode.Disposable {
 
       panel.webview.onDidReceiveMessage((message: { action?: string }) => {
         if (!message.action) {
+          return;
+        }
+
+        if (message.action === '查看统计') {
+          void this.openStatsPanel({
+            viewColumn: vscode.ViewColumn.Beside,
+            preserveFocus: false,
+          });
           return;
         }
 
@@ -1695,17 +1708,17 @@ class MindfulController implements vscode.Disposable {
   <style>
     :root {
       color-scheme: light;
-      --page: linear-gradient(180deg, #f4f5f8 0%, #edf1f7 100%);
-      --page-glow: radial-gradient(circle at top, color-mix(in srgb, ${accent} 12%, white 88%), transparent 52%);
-      --surface: rgba(255, 255, 255, 0.96);
-      --surface-soft: rgba(246, 247, 251, 0.98);
-      --surface-tint: color-mix(in srgb, ${accent} 6%, white 94%);
-      --border: rgba(15, 23, 42, 0.08);
+      --page: linear-gradient(180deg, #f7f8fb 0%, #eef1f6 100%);
+      --page-glow: radial-gradient(circle at top, color-mix(in srgb, ${accent} 8%, white 92%), transparent 48%);
+      --surface: rgba(255, 255, 255, 0.98);
+      --surface-soft: rgba(248, 249, 252, 0.98);
+      --border: rgba(15, 23, 42, 0.06);
       --accent: ${accent};
-      --accent-soft: color-mix(in srgb, ${accent} 14%, white 86%);
-      --text: #111827;
-      --muted: #6b7280;
-      --shadow: 0 28px 56px rgba(15, 23, 42, 0.14), 0 10px 24px rgba(15, 23, 42, 0.08);
+      --accent-soft: color-mix(in srgb, ${accent} 10%, white 90%);
+      --text: #1c1c1e;
+      --muted: #6e6e73;
+      --hairline: rgba(60, 60, 67, 0.14);
+      --shadow: 0 22px 44px rgba(15, 23, 42, 0.10), 0 6px 18px rgba(15, 23, 42, 0.05);
     }
 
     * { box-sizing: border-box; }
@@ -1722,13 +1735,13 @@ class MindfulController implements vscode.Disposable {
     }
 
     .sheet {
-      width: min(820px, 100%);
-      border-radius: 30px;
-      border: 1px solid rgba(255, 255, 255, 0.88);
+      width: min(760px, 100%);
+      border-radius: 28px;
+      border: 1px solid rgba(255, 255, 255, 0.92);
       background: linear-gradient(180deg, var(--surface) 0%, var(--surface-soft) 100%);
       box-shadow: var(--shadow);
-      padding: 36px 32px 30px;
-      backdrop-filter: blur(24px);
+      padding: 18px 22px 22px;
+      backdrop-filter: blur(20px);
       position: relative;
       overflow: hidden;
     }
@@ -1736,30 +1749,31 @@ class MindfulController implements vscode.Disposable {
     .sheet::before {
       content: '';
       position: absolute;
-      top: 14px;
+      top: 9px;
       left: 50%;
       transform: translateX(-50%);
-      width: 52px;
-      height: 5px;
+      width: 38px;
+      height: 4px;
       border-radius: 999px;
-      background: rgba(60, 60, 67, 0.18);
+      background: rgba(60, 60, 67, 0.22);
     }
 
     .hero {
       display: grid;
-      grid-template-columns: minmax(0, 1.25fr) minmax(240px, 0.75fr);
-      gap: 18px;
-      align-items: start;
+      grid-template-columns: minmax(0, 1fr) minmax(220px, 0.72fr);
+      gap: 14px;
+      align-items: stretch;
       position: relative;
       z-index: 1;
+      margin-top: 18px;
     }
 
     .eyebrow {
-      font-size: 11px;
-      letter-spacing: 0.18em;
+      font-size: 10px;
+      letter-spacing: 0.16em;
       text-transform: uppercase;
       color: #8e8e93;
-      margin-bottom: 12px;
+      margin-bottom: 10px;
       font-weight: 600;
     }
 
@@ -1768,92 +1782,93 @@ class MindfulController implements vscode.Disposable {
     .title-row {
       display: flex;
       align-items: center;
-      gap: 14px;
-      margin-bottom: 12px;
+      gap: 12px;
+      margin-bottom: 10px;
     }
 
     .icon-badge {
-      width: 64px;
-      height: 64px;
+      width: 56px;
+      height: 56px;
       flex: 0 0 auto;
       display: grid;
       place-items: center;
-      border-radius: 20px;
-      font-size: 32px;
-      background: linear-gradient(180deg, var(--accent-soft), color-mix(in srgb, var(--accent) 18%, white 82%));
-      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9), 0 10px 22px color-mix(in srgb, var(--accent) 14%, transparent);
+      border-radius: 18px;
+      font-size: 28px;
+      background: linear-gradient(180deg, var(--accent-soft), color-mix(in srgb, var(--accent) 12%, white 88%));
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.92), 0 8px 18px color-mix(in srgb, var(--accent) 10%, transparent);
     }
 
     h1 {
-      font-size: clamp(28px, 5vw, 40px);
+      font-size: clamp(26px, 4.8vw, 36px);
       font-weight: 700;
-      letter-spacing: -0.03em;
+      letter-spacing: -0.035em;
     }
 
     .headline {
-      font-size: 15px;
+      font-size: 14px;
       font-weight: 600;
       color: #3c3c43;
-      margin-bottom: 14px;
+      margin-bottom: 12px;
     }
 
     .message {
-      font-size: 16px;
-      line-height: 1.75;
+      font-size: 15px;
+      line-height: 1.65;
       color: var(--muted);
       margin-bottom: 0;
     }
 
     .aside {
-      border-radius: 22px;
-      padding: 18px;
-      background: linear-gradient(180deg, rgba(250, 250, 252, 0.98), rgba(244, 245, 249, 0.98));
-      border: 1px solid rgba(15, 23, 42, 0.06);
-      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.96);
+      border-radius: 20px;
+      padding: 14px;
+      background: linear-gradient(180deg, rgba(250, 250, 252, 0.98), rgba(246, 247, 250, 0.98));
+      border: 1px solid rgba(15, 23, 42, 0.05);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.98);
     }
 
     .chips {
       display: flex;
-      gap: 8px;
+      gap: 6px;
       flex-wrap: wrap;
-      margin-bottom: 14px;
+      margin-bottom: 10px;
     }
 
     .chip {
       display: inline-flex;
       align-items: center;
       gap: 6px;
-      padding: 8px 12px;
+      padding: 7px 10px;
       border-radius: 999px;
-      border: 1px solid rgba(15, 23, 42, 0.06);
-      background: rgba(255, 255, 255, 0.88);
+      border: 1px solid var(--hairline);
+      background: rgba(255, 255, 255, 0.9);
       color: #6d7280;
-      font-size: 12px;
+      font-size: 11px;
       line-height: 1;
     }
 
     .chip.primary {
       color: var(--accent);
-      border-color: color-mix(in srgb, var(--accent) 20%, white 80%);
+      border-color: color-mix(in srgb, var(--accent) 16%, white 84%);
       background: var(--accent-soft);
       font-weight: 600;
     }
 
     .notice {
-      padding: 16px 18px;
-      border-radius: 18px;
-      border: 1px solid color-mix(in srgb, var(--accent) 16%, white 84%);
-      background: color-mix(in srgb, var(--accent) 8%, white 92%);
+      padding: 14px;
+      border-radius: 16px;
+      border: 1px solid color-mix(in srgb, var(--accent) 10%, white 90%);
+      background: color-mix(in srgb, var(--accent) 5%, white 95%);
       color: #3c3c43;
-      line-height: 1.6;
+      line-height: 1.55;
+      font-size: 13px;
       margin-bottom: 0;
     }
 
     .actions {
       display: flex;
-      gap: 12px;
+      gap: 10px;
       flex-wrap: wrap;
-      margin-top: 22px;
+      margin-top: 16px;
       position: relative;
       z-index: 1;
     }
@@ -1861,8 +1876,8 @@ class MindfulController implements vscode.Disposable {
     button {
       appearance: none;
       border: 1px solid transparent;
-      border-radius: 16px;
-      padding: 13px 20px;
+      border-radius: 14px;
+      padding: 12px 16px;
       font: inherit;
       font-weight: 600;
       cursor: pointer;
@@ -1872,32 +1887,31 @@ class MindfulController implements vscode.Disposable {
     button.primary {
       color: white;
       background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 88%, white 12%), var(--accent));
-      box-shadow: 0 14px 28px color-mix(in srgb, var(--accent) 22%, transparent);
+      box-shadow: 0 10px 22px color-mix(in srgb, var(--accent) 18%, transparent);
     }
 
     button.ghost {
       color: #1f2937;
       background: rgba(255, 255, 255, 0.92);
-      border: 1px solid rgba(15, 23, 42, 0.08);
+      border: 1px solid var(--hairline);
       box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.92);
     }
 
     button:hover {
       transform: translateY(-1px);
-      opacity: 0.98;
     }
 
     button:focus-visible {
       outline: none;
-      border-color: color-mix(in srgb, var(--accent) 40%, white 60%);
-      box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 18%, white 82%);
+      border-color: color-mix(in srgb, var(--accent) 28%, white 72%);
+      box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 12%, white 88%);
     }
 
     .footnote {
-      margin-top: 18px;
+      margin-top: 14px;
       color: #8e8e93;
       font-size: 12px;
-      line-height: 1.6;
+      line-height: 1.5;
       position: relative;
       z-index: 1;
     }
@@ -1905,6 +1919,10 @@ class MindfulController implements vscode.Disposable {
     @media (max-width: 640px) {
       .hero {
         grid-template-columns: 1fr;
+      }
+
+      .sheet {
+        padding: 16px 16px 18px;
       }
 
       .title-row {
