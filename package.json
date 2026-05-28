@@ -1,0 +1,149 @@
+{
+  "name": "mindful-coder",
+  "displayName": "Mindful Coder",
+  "description": "Non-intrusive hydration, break, and sedentary reminders for VS Code.",
+  "version": "0.0.1",
+  "publisher": "local",
+  "license": "UNLICENSED",
+  "engines": {
+    "vscode": "^1.95.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "mindfulCoder.openControls",
+        "title": "Mindful Coder: 打开提醒面板"
+      },
+      {
+        "command": "mindfulCoder.setHydrationInterval",
+        "title": "Mindful Coder: 设置喝水提醒间隔"
+      },
+      {
+        "command": "mindfulCoder.setRestInterval",
+        "title": "Mindful Coder: 设置休息提醒间隔"
+      },
+      {
+        "command": "mindfulCoder.setWorkdayEndTime",
+        "title": "Mindful Coder: 设置下班时间"
+      },
+      {
+        "command": "mindfulCoder.markHydrated",
+        "title": "Mindful Coder: 记录喝水"
+      },
+      {
+        "command": "mindfulCoder.takeBreakNow",
+        "title": "Mindful Coder: 记录休息"
+      },
+      {
+        "command": "mindfulCoder.showStats",
+        "title": "Mindful Coder: 查看今日统计"
+      },
+      {
+        "command": "mindfulCoder.resetSedentaryTimer",
+        "title": "Mindful Coder: 重置久坐计时"
+      }
+    ],
+    "configuration": {
+      "title": "Mindful Coder",
+      "properties": {
+        "mindfulCoder.statusBar.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "显示底部状态栏提醒组件。"
+        },
+        "mindfulCoder.hydration.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "启用喝水提醒。"
+        },
+        "mindfulCoder.hydration.intervalMinutes": {
+          "type": "number",
+          "default": 40,
+          "minimum": 1,
+          "description": "喝水提醒间隔，单位分钟。"
+        },
+        "mindfulCoder.hydration.notification": {
+          "type": "boolean",
+          "default": true,
+          "description": "到点时显示 VS Code 信息通知。"
+        },
+        "mindfulCoder.hydration.sound": {
+          "type": "boolean",
+          "default": false,
+          "description": "喝水提醒时尝试播放系统提示音。"
+        },
+        "mindfulCoder.rest.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "启用休息提醒。"
+        },
+        "mindfulCoder.rest.intervalMinutes": {
+          "type": "number",
+          "default": 50,
+          "minimum": 1,
+          "description": "休息提醒间隔，单位分钟。"
+        },
+        "mindfulCoder.rest.notification": {
+          "type": "boolean",
+          "default": true,
+          "description": "到点时显示 VS Code 信息通知。"
+        },
+        "mindfulCoder.rest.sound": {
+          "type": "boolean",
+          "default": false,
+          "description": "休息提醒时尝试播放系统提示音。"
+        },
+        "mindfulCoder.sedentary.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "启用连续工作久坐检测。"
+        },
+        "mindfulCoder.sedentary.thresholdMinutes": {
+          "type": "number",
+          "default": 120,
+          "minimum": 1,
+          "description": "连续活跃达到多少分钟后触发久坐提醒。"
+        },
+        "mindfulCoder.sedentary.idleResetMinutes": {
+          "type": "number",
+          "default": 5,
+          "minimum": 1,
+          "description": "超过多少分钟没有编辑器活动就重置连续工作时长。"
+        },
+        "mindfulCoder.sedentary.notification": {
+          "type": "boolean",
+          "default": true,
+          "description": "久坐阈值达到时显示 VS Code 信息通知。"
+        },
+        "mindfulCoder.sedentary.sound": {
+          "type": "boolean",
+          "default": false,
+          "description": "久坐提醒时尝试播放系统提示音。"
+        },
+        "mindfulCoder.workday.endTime": {
+          "type": "string",
+          "default": "18:30",
+          "pattern": "^([01]\\d|2[0-3]):([0-5]\\d)$",
+          "description": "下班时间，格式为 HH:mm，用于今日统计面板中的工作进度与倒计时。"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "prepublishOnly": "npm run compile"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.10",
+    "@types/vscode": "^1.95.0",
+    "typescript": "^5.6.3"
+  }
+}
