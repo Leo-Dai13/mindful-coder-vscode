@@ -953,7 +953,26 @@ class MindfulController implements vscode.Disposable {
     const config = vscode.workspace.getConfiguration('mindfulCoder');
     const key = kind === 'hydration' ? 'hydration.intervalMinutes' : 'rest.intervalMinutes';
     await config.update(key, minutes, vscode.ConfigurationTarget.Global);
+
+    if (kind === 'hydration') {
+      this.hydrationState = {
+        ...this.hydrationState,
+        snoozeUntil: undefined,
+        lastNotifiedAt: undefined,
+      };
+      await this.saveHydrationState();
+    } else {
+      this.restState = {
+        ...this.restState,
+        snoozeUntil: undefined,
+        lastNotifiedAt: undefined,
+      };
+      await this.saveRestState();
+    }
+
+    this.config = readConfig();
     this.flashStatus(`${label}提醒已设置为 ${minutes} 分钟`);
+    this.updateStatusBar();
   }
 
   private async showStats(): Promise<void> {
