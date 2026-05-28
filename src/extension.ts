@@ -683,6 +683,11 @@ class MindfulController implements vscode.Disposable {
 
       if (selection === notificationTimedOut || selection === undefined) {
         await onIgnored(Date.now());
+        try {
+          await messagePromise;
+        } catch {
+          // Ignore notification API failures while waiting for the stale message to settle.
+        }
         return;
       }
 
@@ -1077,31 +1082,9 @@ class MindfulController implements vscode.Disposable {
       }
     }, undefined, this.disposables);
 
-    panel.webview.onDidReceiveMessage(async (message: { command?: string }) => {
-      switch (message.command) {
-        case 'markHydrated':
-          await this.markHydrated('manual');
-          break;
-        case 'takeBreak':
-          await this.markBreakTaken('manual');
-          break;
-        case 'setHydrationInterval':
-          await this.promptForInterval('hydration');
-          break;
-        case 'setRestInterval':
-          await this.promptForInterval('rest');
-          break;
-        case 'setWorkdayEndTime':
-          await this.promptForWorkdayEndTime();
-          break;
-        case 'resetSedentary':
-          await this.resetSedentaryTimer();
-          break;
-        case 'refreshStats':
-          this.updateStatsPanel();
-          break;
-        default:
-          break;
+    panel.webview.onDidReceiveMessage((message: { command?: string }) => {
+      if (message.command === 'refreshStats') {
+        this.updateStatsPanel();
       }
     }, undefined, this.disposables);
 
@@ -1562,20 +1545,6 @@ class MindfulController implements vscode.Disposable {
         </div>
       </article>
 
-      <article class="card actions card-wide">
-        <div class="section-head">
-          <h2>快捷操作</h2>
-          <span class="mini-label">直接在面板里调整当天节奏</span>
-        </div>
-        <div class="actions">
-          <button data-command="markHydrated">记录已喝水</button>
-          <button class="ghost" data-command="takeBreak">记录已休息</button>
-          <button class="ghost" data-command="setHydrationInterval">设置喝水间隔</button>
-          <button class="ghost" data-command="setRestInterval">设置休息间隔</button>
-          <button class="ghost" data-command="setWorkdayEndTime">设置下班时间</button>
-          <button class="ghost" data-command="resetSedentary">重置久坐计时</button>
-        </div>
-      </article>
     </section>
 
     <p class="footnote">代码工作量为基于 VS Code 文档变更的近似统计，会记录新增/删除字符、行数、编辑次数与触达文件数。它不是 Git 提交统计，也不是系统级键鼠监控。</p>
