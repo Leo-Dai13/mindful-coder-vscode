@@ -1794,10 +1794,13 @@ class MindfulController implements vscode.Disposable {
     }
 
     .hero {
-      display: block;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
       position: relative;
       z-index: 1;
       margin-top: 18px;
+      text-align: center;
     }
 
     h1, p { margin: 0; }
@@ -1807,6 +1810,7 @@ class MindfulController implements vscode.Disposable {
       align-items: center;
       gap: 12px;
       margin-bottom: 16px;
+      justify-content: center;
     }
 
     .icon-badge {
@@ -1822,23 +1826,25 @@ class MindfulController implements vscode.Disposable {
     }
 
     h1 {
-      font-size: clamp(24px, 4.2vw, 32px);
+      font-size: clamp(22px, 4vw, 30px);
       font-weight: 700;
       letter-spacing: -0.035em;
+      line-height: 1.15;
     }
 
     .message {
-      font-size: 14px;
-      line-height: 1.6;
+      font-size: 15px;
+      line-height: 1.55;
       color: var(--muted);
       margin-bottom: 0;
-      max-width: 420px;
+      max-width: 360px;
     }
 
     .actions {
       display: flex;
       gap: 10px;
       flex-wrap: wrap;
+      justify-content: center;
       margin-top: auto;
       padding-top: 28px;
       position: relative;
@@ -1849,8 +1855,11 @@ class MindfulController implements vscode.Disposable {
       appearance: none;
       border: 1px solid transparent;
       border-radius: 14px;
-      padding: 12px 16px;
+      min-width: 116px;
+      min-height: 50px;
+      padding: 12px 18px;
       font: inherit;
+      font-size: 15px;
       font-weight: 600;
       cursor: pointer;
       transition: transform 140ms ease, opacity 140ms ease, border-color 140ms ease, box-shadow 140ms ease;
@@ -1887,7 +1896,13 @@ class MindfulController implements vscode.Disposable {
       }
 
       .title-row {
+        justify-content: flex-start;
         align-items: flex-start;
+      }
+
+      .hero {
+        align-items: stretch;
+        text-align: left;
       }
 
       .message {
