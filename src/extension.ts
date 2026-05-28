@@ -253,6 +253,7 @@ class MindfulController implements vscode.Disposable {
   private sedentaryLastNotifiedAt?: number;
   private statsPanel?: vscode.WebviewPanel;
   private reminderPanel?: vscode.WebviewPanel;
+  private pendingReminderCheckHandle?: ReturnType<typeof setTimeout>;
 
   constructor(private readonly context: vscode.ExtensionContext) {
     const now = Date.now();
@@ -260,8 +261,7 @@ class MindfulController implements vscode.Disposable {
     this.restState = normalizeRestState(context.globalState.get<RestState>(REST_STATE_KEY), now);
     this.workStatsState = normalizeWorkStatsState(context.globalState.get<WorkStatsState>(WORK_STATS_STATE_KEY), now);
     this.activityTracker = new ActivityTracker(this.config, () => {
-      this.updateStatusBar();
-      this.updateStatsPanel();
+      this.scheduleReminderCheck();
     });
 
     this.statusBar.name = 'Mindful Coder';
@@ -291,6 +291,13 @@ class MindfulController implements vscode.Disposable {
 
     this.disposables.push(new vscode.Disposable(() => {
       clearInterval(this.tickHandle);
+    }));
+
+    this.disposables.push(new vscode.Disposable(() => {
+      if (this.pendingReminderCheckHandle) {
+        clearTimeout(this.pendingReminderCheckHandle);
+        this.pendingReminderCheckHandle = undefined;
+      }
     }));
 
     void this.tick();
@@ -338,19 +345,38 @@ class MindfulController implements vscode.Disposable {
     this.restState = normalizeRestState(this.restState);
     this.workStatsState = normalizeWorkStatsState(this.workStatsState);
     await this.persistStates();
-    this.updateStatusBar();
-    this.updateStatsPanel();
+    const now = Date.now();
+    const snapshot = this.refreshUi(now);
+    await this.maybeNotify(now, snapshot);
   }
 
   private async tick(): Promise<void> {
     const now = Date.now();
+    const snapshot = this.refreshUi(now);
+    await this.saveWorkStatsState();
+    await this.maybeNotify(now, snapshot);
+  }
+
+  private refreshUi(now = Date.now()): ActivitySnapshot {
     this.resetDailyIfNeeded(now);
     const snapshot = this.syncSedentarySession(this.activityTracker.getSnapshot(now));
     this.syncWorkStats(now, snapshot);
     this.updateStatusBar(now, snapshot);
     this.updateStatsPanel(now, snapshot);
-    await this.saveWorkStatsState();
-    await this.maybeNotify(now, snapshot);
+    return snapshot;
+  }
+
+  private scheduleReminderCheck(): void {
+    if (this.pendingReminderCheckHandle) {
+      return;
+    }
+
+    this.pendingReminderCheckHandle = setTimeout(() => {
+      this.pendingReminderCheckHandle = undefined;
+      const now = Date.now();
+      const snapshot = this.refreshUi(now);
+      void this.maybeNotify(now, snapshot);
+    }, 0);
   }
 
   private resetDailyIfNeeded(now = Date.now()): void {
@@ -681,7 +707,7 @@ class MindfulController implements vscode.Disposable {
     const panel = vscode.window.createWebviewPanel(
       'mindfulCoder.reminder',
       `Mindful Coder ${model.title}`,
-      vscode.ViewColumn.Active,
+      { viewColumn: vscode.ViewColumn.Active, preserveFocus: false },
       {
         enableScripts: true,
         retainContextWhenHidden: false,
@@ -1654,8 +1680,10 @@ class MindfulController implements vscode.Disposable {
       const className = index === 0 ? 'primary' : 'ghost';
       return `<button class="${className}" data-action="${escapeHtml(action)}">${escapeHtml(action)}</button>`;
     }).join('');
+    const icon = model.title.includes('喝水') ? '💧' : model.title.includes('休息') ? '👀' : model.title.includes('久坐') ? '🪑' : '⏰';
     const accent = model.severity === 'warning' ? '#f2a65a' : '#61c0bf';
     const accentDeep = model.severity === 'warning' ? '#8d4a1f' : '#0f4f56';
+    const toneLabel = model.severity === 'warning' ? '高优先级提醒' : '轻提醒';
 
     return `<!DOCTYPE html>
 <html lang="zh-CN">
@@ -1667,11 +1695,12 @@ class MindfulController implements vscode.Disposable {
   <style>
     :root {
       color-scheme: light dark;
-      --bg: linear-gradient(165deg, color-mix(in srgb, var(--vscode-editor-background) 88%, ${accent} 12%), color-mix(in srgb, var(--vscode-editor-background) 92%, ${accentDeep} 8%));
+      --bg: radial-gradient(circle at top left, color-mix(in srgb, ${accent} 20%, transparent), transparent 34%), radial-gradient(circle at bottom right, color-mix(in srgb, ${accentDeep} 34%, transparent), transparent 36%), linear-gradient(165deg, color-mix(in srgb, var(--vscode-editor-background) 88%, ${accent} 12%), color-mix(in srgb, var(--vscode-editor-background) 92%, ${accentDeep} 8%));
       --panel: color-mix(in srgb, var(--vscode-sideBar-background) 84%, transparent);
       --panel-strong: color-mix(in srgb, var(--vscode-editorWidget-background) 92%, ${accentDeep} 8%);
       --border: color-mix(in srgb, var(--vscode-panel-border) 72%, transparent);
       --accent: ${accent};
+      --accent-soft: color-mix(in srgb, ${accent} 22%, transparent);
       --text: var(--vscode-editor-foreground);
       --muted: color-mix(in srgb, var(--vscode-descriptionForeground) 88%, var(--vscode-editor-foreground) 12%);
       --shadow: 0 18px 48px rgba(0, 0, 0, 0.18);
@@ -1684,20 +1713,56 @@ class MindfulController implements vscode.Disposable {
       min-height: 100vh;
       display: grid;
       place-items: center;
-      padding: 28px;
+      padding: 24px;
       font-family: 'Segoe UI Variable Text', 'Microsoft YaHei UI', sans-serif;
       color: var(--text);
       background: var(--bg);
     }
 
     .sheet {
-      width: min(760px, 100%);
-      border-radius: 28px;
+      width: min(860px, 100%);
+      border-radius: 32px;
       border: 1px solid var(--border);
       background: linear-gradient(135deg, color-mix(in srgb, var(--panel-strong) 88%, ${accentDeep} 12%), color-mix(in srgb, var(--panel) 94%, transparent));
       box-shadow: var(--shadow);
-      padding: 30px;
+      padding: 34px;
       backdrop-filter: blur(16px);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .sheet::before,
+    .sheet::after {
+      content: '';
+      position: absolute;
+      border-radius: 999px;
+      pointer-events: none;
+      opacity: 0.5;
+    }
+
+    .sheet::before {
+      width: 220px;
+      height: 220px;
+      top: -120px;
+      right: -80px;
+      background: radial-gradient(circle, color-mix(in srgb, var(--accent) 28%, transparent), transparent 68%);
+    }
+
+    .sheet::after {
+      width: 160px;
+      height: 160px;
+      bottom: -60px;
+      left: -40px;
+      background: radial-gradient(circle, color-mix(in srgb, ${accentDeep} 32%, transparent), transparent 70%);
+    }
+
+    .hero {
+      display: grid;
+      grid-template-columns: minmax(0, 1.25fr) minmax(240px, 0.75fr);
+      gap: 20px;
+      align-items: start;
+      position: relative;
+      z-index: 1;
     }
 
     .eyebrow {
@@ -1705,15 +1770,34 @@ class MindfulController implements vscode.Disposable {
       letter-spacing: 0.24em;
       text-transform: uppercase;
       color: var(--accent);
-      margin-bottom: 12px;
+      margin-bottom: 10px;
     }
 
     h1, p { margin: 0; }
 
+    .title-row {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 14px;
+    }
+
+    .icon-badge {
+      width: 68px;
+      height: 68px;
+      flex: 0 0 auto;
+      display: grid;
+      place-items: center;
+      border-radius: 22px;
+      font-size: 34px;
+      background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 26%, transparent), color-mix(in srgb, ${accentDeep} 24%, transparent));
+      border: 1px solid color-mix(in srgb, var(--accent) 42%, var(--border) 58%);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    }
+
     h1 {
       font-size: clamp(28px, 5vw, 42px);
       font-weight: 700;
-      margin-bottom: 12px;
     }
 
     .headline {
@@ -1725,41 +1809,78 @@ class MindfulController implements vscode.Disposable {
 
     .message {
       font-size: 16px;
-      line-height: 1.75;
+      line-height: 1.8;
       color: var(--muted);
-      margin-bottom: 22px;
+      margin-bottom: 0;
+    }
+
+    .aside {
+      border-radius: 24px;
+      padding: 18px;
+      background: linear-gradient(180deg, color-mix(in srgb, var(--panel-strong) 92%, transparent), color-mix(in srgb, var(--panel) 88%, transparent));
+      border: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+    }
+
+    .chips {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-bottom: 16px;
+    }
+
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      border-radius: 999px;
+      border: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
+      background: color-mix(in srgb, var(--panel) 88%, transparent);
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1;
+    }
+
+    .chip.primary {
+      color: var(--text);
+      border-color: color-mix(in srgb, var(--accent) 46%, var(--border) 54%);
+      background: var(--accent-soft);
     }
 
     .notice {
-      padding: 14px 16px;
+      padding: 16px 18px;
       border-radius: 18px;
       border: 1px solid color-mix(in srgb, var(--accent) 42%, var(--border) 58%);
       background: color-mix(in srgb, var(--accent) 14%, transparent);
       color: var(--text);
       line-height: 1.6;
-      margin-bottom: 22px;
+      margin-bottom: 0;
     }
 
     .actions {
       display: flex;
       gap: 12px;
       flex-wrap: wrap;
+      margin-top: 24px;
+      position: relative;
+      z-index: 1;
     }
 
     button {
       appearance: none;
-      border: 0;
+      border: 1px solid transparent;
       border-radius: 14px;
-      padding: 12px 18px;
+      padding: 13px 18px;
       font: inherit;
       cursor: pointer;
-      transition: transform 140ms ease, opacity 140ms ease;
+      transition: transform 140ms ease, opacity 140ms ease, border-color 140ms ease, box-shadow 140ms ease;
     }
 
     button.primary {
       color: #0f1b22;
       background: linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 72%, white 28%));
-      box-shadow: 0 10px 24px rgba(0, 0, 0, 0.16);
+      box-shadow: 0 12px 28px rgba(0, 0, 0, 0.18);
     }
 
     button.ghost {
@@ -1773,14 +1894,30 @@ class MindfulController implements vscode.Disposable {
       opacity: 0.98;
     }
 
+    button:focus-visible {
+      outline: none;
+      border-color: color-mix(in srgb, var(--accent) 58%, white 42%);
+      box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 24%, transparent);
+    }
+
     .footnote {
-      margin-top: 16px;
+      margin-top: 18px;
       color: var(--muted);
       font-size: 12px;
       line-height: 1.6;
+      position: relative;
+      z-index: 1;
     }
 
     @media (max-width: 640px) {
+      .hero {
+        grid-template-columns: 1fr;
+      }
+
+      .title-row {
+        align-items: flex-start;
+      }
+
       .actions {
         flex-direction: column;
       }
@@ -1793,11 +1930,27 @@ class MindfulController implements vscode.Disposable {
 </head>
 <body>
   <main class="sheet">
-    <div class="eyebrow">Mindful Coder</div>
-    <h1>${escapeHtml(model.title)}</h1>
-    <p class="headline">${escapeHtml(model.headline)}</p>
-    <p class="message">${escapeHtml(model.message)}</p>
-    <div class="notice">关闭页面或 3 分钟内不处理，本次提醒会自动视为忽略，并从当前时刻重新开始计时。</div>
+    <section class="hero">
+      <div>
+        <div class="eyebrow">Mindful Coder</div>
+        <div class="title-row">
+          <div class="icon-badge">${icon}</div>
+          <div>
+            <h1>${escapeHtml(model.title)}</h1>
+            <p class="headline">${escapeHtml(model.headline)}</p>
+          </div>
+        </div>
+        <p class="message">${escapeHtml(model.message)}</p>
+      </div>
+      <aside class="aside">
+        <div class="chips">
+          <span class="chip primary">${toneLabel}</span>
+          <span class="chip">3 分钟自动忽略</span>
+          <span class="chip">非模态提醒</span>
+        </div>
+        <div class="notice">关闭页面或 3 分钟内不处理，本次提醒会自动视为忽略，并从当前时刻重新开始计时。</div>
+      </aside>
+    </section>
     <div class="actions">${actionButtons}</div>
     <p class="footnote">这是一个页面式提醒面板，不使用模态弹窗，也不会锁住编辑器输入。</p>
   </main>
