@@ -1767,15 +1767,18 @@ class MindfulController implements vscode.Disposable {
     }
 
     .sheet {
-      width: min(760px, 100%);
+      width: min(620px, calc(100vw - 56px));
+      min-height: 384px;
       border-radius: 28px;
       border: 1px solid var(--border);
       background: linear-gradient(180deg, var(--surface) 0%, var(--surface-soft) 100%);
       box-shadow: var(--shadow);
-      padding: 18px 22px 22px;
+      padding: 20px 22px 22px;
       backdrop-filter: blur(20px);
       position: relative;
       overflow: hidden;
+      display: flex;
+      flex-direction: column;
     }
 
     .sheet::before {
@@ -1794,7 +1797,7 @@ class MindfulController implements vscode.Disposable {
       display: block;
       position: relative;
       z-index: 1;
-      margin-top: 16px;
+      margin-top: 18px;
     }
 
     h1, p { margin: 0; }
@@ -1803,12 +1806,12 @@ class MindfulController implements vscode.Disposable {
       display: flex;
       align-items: center;
       gap: 12px;
-      margin-bottom: 14px;
+      margin-bottom: 16px;
     }
 
     .icon-badge {
-      width: 52px;
-      height: 52px;
+      width: 54px;
+      height: 54px;
       flex: 0 0 auto;
       display: grid;
       place-items: center;
@@ -1819,7 +1822,7 @@ class MindfulController implements vscode.Disposable {
     }
 
     h1 {
-      font-size: clamp(24px, 4.4vw, 34px);
+      font-size: clamp(24px, 4.2vw, 32px);
       font-weight: 700;
       letter-spacing: -0.035em;
     }
@@ -1829,13 +1832,15 @@ class MindfulController implements vscode.Disposable {
       line-height: 1.6;
       color: var(--muted);
       margin-bottom: 0;
+      max-width: 420px;
     }
 
     .actions {
       display: flex;
       gap: 10px;
       flex-wrap: wrap;
-      margin-top: 24px;
+      margin-top: auto;
+      padding-top: 28px;
       position: relative;
       z-index: 1;
     }
@@ -1876,6 +1881,8 @@ class MindfulController implements vscode.Disposable {
 
     @media (max-width: 640px) {
       .sheet {
+        width: min(100%, calc(100vw - 28px));
+        min-height: auto;
         padding: 16px 16px 18px;
       }
 
@@ -1883,8 +1890,13 @@ class MindfulController implements vscode.Disposable {
         align-items: flex-start;
       }
 
+      .message {
+        max-width: none;
+      }
+
       .actions {
         flex-direction: column;
+        padding-top: 22px;
       }
 
       button {
