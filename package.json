@@ -3,7 +3,7 @@
   "displayName": "Mindful Coder",
   "description": "Non-intrusive hydration, break, and sedentary reminders for VS Code.",
   "version": "0.0.2",
-  "publisher": "local",
+  "publisher": "leo-dai13",
   "icon": "assets/icon.png",
   "repository": {
     "type": "git",
