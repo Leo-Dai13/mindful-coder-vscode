@@ -1708,16 +1708,16 @@ class MindfulController implements vscode.Disposable {
   <style>
     :root {
       color-scheme: light;
-      --page: linear-gradient(180deg, #f7f8fb 0%, #eef1f6 100%);
-      --page-glow: radial-gradient(circle at top, color-mix(in srgb, ${accent} 8%, white 92%), transparent 48%);
-      --surface: rgba(255, 255, 255, 0.98);
-      --surface-soft: rgba(248, 249, 252, 0.98);
-      --border: rgba(15, 23, 42, 0.06);
+      --page: var(--vscode-editor-background);
+      --page-glow: radial-gradient(circle at top, color-mix(in srgb, ${accent} 10%, transparent), transparent 48%);
+      --surface: color-mix(in srgb, var(--vscode-editor-background) 86%, white 14%);
+      --surface-soft: color-mix(in srgb, var(--vscode-editorWidget-background) 74%, var(--vscode-editor-background) 26%);
+      --border: color-mix(in srgb, var(--vscode-panel-border) 72%, transparent);
       --accent: ${accent};
-      --accent-soft: color-mix(in srgb, ${accent} 10%, white 90%);
-      --text: #1c1c1e;
-      --muted: #6e6e73;
-      --hairline: rgba(60, 60, 67, 0.14);
+      --accent-soft: color-mix(in srgb, ${accent} 14%, var(--vscode-editor-background) 86%);
+      --text: var(--vscode-editor-foreground);
+      --muted: color-mix(in srgb, var(--vscode-descriptionForeground) 82%, var(--vscode-editor-foreground) 18%);
+      --hairline: color-mix(in srgb, var(--vscode-panel-border) 65%, transparent);
       --shadow: 0 22px 44px rgba(15, 23, 42, 0.10), 0 6px 18px rgba(15, 23, 42, 0.05);
     }
 
@@ -1737,7 +1737,7 @@ class MindfulController implements vscode.Disposable {
     .sheet {
       width: min(760px, 100%);
       border-radius: 28px;
-      border: 1px solid rgba(255, 255, 255, 0.92);
+      border: 1px solid var(--border);
       background: linear-gradient(180deg, var(--surface) 0%, var(--surface-soft) 100%);
       box-shadow: var(--shadow);
       padding: 18px 22px 22px;
@@ -1772,7 +1772,7 @@ class MindfulController implements vscode.Disposable {
       font-size: 10px;
       letter-spacing: 0.16em;
       text-transform: uppercase;
-      color: #8e8e93;
+      color: var(--muted);
       margin-bottom: 10px;
       font-weight: 600;
     }
@@ -1807,7 +1807,7 @@ class MindfulController implements vscode.Disposable {
     .headline {
       font-size: 14px;
       font-weight: 600;
-      color: #3c3c43;
+      color: var(--text);
       margin-bottom: 12px;
     }
 
@@ -1821,9 +1821,9 @@ class MindfulController implements vscode.Disposable {
     .aside {
       border-radius: 20px;
       padding: 14px;
-      background: linear-gradient(180deg, rgba(250, 250, 252, 0.98), rgba(246, 247, 250, 0.98));
-      border: 1px solid rgba(15, 23, 42, 0.05);
-      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.98);
+      background: color-mix(in srgb, var(--vscode-sideBar-background) 76%, var(--surface) 24%);
+      border: 1px solid var(--hairline);
+      box-shadow: inset 0 1px 0 color-mix(in srgb, var(--vscode-editorWidget-border) 30%, transparent);
     }
 
     .chips {
@@ -1840,8 +1840,8 @@ class MindfulController implements vscode.Disposable {
       padding: 7px 10px;
       border-radius: 999px;
       border: 1px solid var(--hairline);
-      background: rgba(255, 255, 255, 0.9);
-      color: #6d7280;
+      background: color-mix(in srgb, var(--surface-soft) 78%, transparent);
+      color: var(--muted);
       font-size: 11px;
       line-height: 1;
     }
@@ -1856,9 +1856,9 @@ class MindfulController implements vscode.Disposable {
     .notice {
       padding: 14px;
       border-radius: 16px;
-      border: 1px solid color-mix(in srgb, var(--accent) 10%, white 90%);
-      background: color-mix(in srgb, var(--accent) 5%, white 95%);
-      color: #3c3c43;
+      border: 1px solid color-mix(in srgb, var(--accent) 18%, var(--hairline) 82%);
+      background: color-mix(in srgb, var(--accent) 8%, var(--surface-soft) 92%);
+      color: var(--text);
       line-height: 1.55;
       font-size: 13px;
       margin-bottom: 0;
@@ -1891,10 +1891,10 @@ class MindfulController implements vscode.Disposable {
     }
 
     button.ghost {
-      color: #1f2937;
-      background: rgba(255, 255, 255, 0.92);
+      color: var(--text);
+      background: color-mix(in srgb, var(--surface-soft) 82%, transparent);
       border: 1px solid var(--hairline);
-      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.92);
+      box-shadow: inset 0 1px 0 color-mix(in srgb, var(--vscode-editorWidget-border) 26%, transparent);
     }
 
     button:hover {
@@ -1909,7 +1909,7 @@ class MindfulController implements vscode.Disposable {
 
     .footnote {
       margin-top: 14px;
-      color: #8e8e93;
+      color: var(--muted);
       font-size: 12px;
       line-height: 1.5;
       position: relative;
