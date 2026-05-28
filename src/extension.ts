@@ -380,14 +380,13 @@ class MindfulController implements vscode.Disposable {
 
     const segments = [
       this.buildHydrationSegment(now),
-      this.buildSedentarySegment(snapshot),
       this.buildRestSegment(now),
     ].filter((segment) => segment.length > 0);
 
     this.statusBar.text = segments.join(' | ');
     this.statusBar.tooltip = this.buildTooltip(now, snapshot);
 
-    const isWarning = this.isHydrationDue(now) || this.isRestDue(now) || this.isSedentaryDue(now, snapshot);
+    const isWarning = this.isHydrationDue(now) || this.isRestDue(now);
     this.statusBar.backgroundColor = isWarning ? new vscode.ThemeColor('statusBarItem.warningBackground') : undefined;
     this.statusBar.color = isWarning ? new vscode.ThemeColor('statusBarItem.warningForeground') : undefined;
   }
@@ -397,7 +396,6 @@ class MindfulController implements vscode.Disposable {
     tooltip.appendMarkdown('**Mindful Coder**\n\n');
     tooltip.appendMarkdown(`饮水：今日 **${this.hydrationState.todayCount}** 次，${this.describeHydration(now)}\n\n`);
     tooltip.appendMarkdown(`休息：${this.describeRest(now)}\n\n`);
-    tooltip.appendMarkdown(`久坐：${this.describeSedentary(snapshot)}\n\n`);
     tooltip.appendMarkdown(`工作：今日专注 **${formatDurationLong(this.workStatsState.activeMsAccumulated)}**，编辑 **${this.workStatsState.editCount}** 次\n\n`);
     tooltip.appendMarkdown('点击状态栏可打开快捷操作。');
     return tooltip;
@@ -429,18 +427,6 @@ class MindfulController implements vscode.Disposable {
     return `👀 ${formatCountdown(remainingMs)}`;
   }
 
-  private buildSedentarySegment(snapshot: ActivitySnapshot): string {
-    if (!this.config.sedentary.enabled) {
-      return '🪑 已关';
-    }
-
-    if (!snapshot.active || snapshot.continuousActiveMs <= 0) {
-      return '';
-    }
-
-    return `🪑 久坐${formatDurationCompact(snapshot.continuousActiveMs)}`;
-  }
-
   private describeHydration(now: number): string {
     if (!this.config.hydration.enabled) {
       return '已关闭';
@@ -465,23 +451,6 @@ class MindfulController implements vscode.Disposable {
     }
 
     return `${formatCountdown(remainingMs)} 后提醒，下次到点 ${formatClock(this.getRestDueAt())}`;
-  }
-
-  private describeSedentary(snapshot: ActivitySnapshot): string {
-    if (!this.config.sedentary.enabled) {
-      return '已关闭';
-    }
-
-    if (!snapshot.active || snapshot.continuousActiveMs <= 0) {
-      return '当前不在连续工作状态';
-    }
-
-    const thresholdMs = this.getSedentaryThresholdMs();
-    if (snapshot.continuousActiveMs >= thresholdMs) {
-      return `连续活跃 ${formatDurationCompact(snapshot.continuousActiveMs)}，已到久坐提醒阈值`;
-    }
-
-    return `连续活跃 ${formatDurationCompact(snapshot.continuousActiveMs)}，距阈值还有 ${formatCountdown(thresholdMs - snapshot.continuousActiveMs)}`;
   }
 
   private async maybeNotify(now: number, snapshot: ActivitySnapshot): Promise<void> {
@@ -974,11 +943,6 @@ class MindfulController implements vscode.Disposable {
 
   private isRestDue(now: number): boolean {
     return this.config.rest.enabled && now >= this.getRestDueAt();
-  }
-
-  private isSedentaryDue(now: number, snapshot: ActivitySnapshot): boolean {
-    const dueAt = this.getSedentaryDueAt(snapshot);
-    return this.config.sedentary.enabled && dueAt !== undefined && now >= dueAt;
   }
 
   private async saveHydrationState(): Promise<void> {
